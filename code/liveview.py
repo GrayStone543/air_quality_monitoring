@@ -8,13 +8,17 @@ NO_ACTIVE = "NO ACTIVE"
 HCHO = "HCHO"
 CO = "CO"
 CO2 = "CO2"
+X = "x"
+Y = "y"
+W = "w"
+H = "h"
 DEFAULT_W = 120
 DEFAULT_H = 54
 DEFAULT_ROI = {
-    HCHO: {"x": 50, "y": 50,  "w": DEFAULT_W, "h": DEFAULT_H, "color": (200, 60, 150), "title": HCHO},
-    CO:   {"x": 50, "y": 250, "w": DEFAULT_W, "h": DEFAULT_H, "color":  (50, 60, 200), "title": CO},
-    CO2:  {"x": 50, "y": 375, "w": DEFAULT_W, "h": DEFAULT_H, "color": (200, 100, 50), "title": CO2},
-    NO_ACTIVE: {"x": 0, "y":0, "w": DEFAULT_W, "h": DEFAULT_H, "color": (128, 128, 128), "title": NO_ACTIVE}
+    HCHO: {X: 50, Y: 50,  W: DEFAULT_W, H: DEFAULT_H, "color": (200, 60, 150), "title": HCHO},
+    CO:   {X: 50, Y: 250, W: DEFAULT_W, H: DEFAULT_H, "color":  (50, 60, 200), "title": CO},
+    CO2:  {X: 50, Y: 375, W: DEFAULT_W, H: DEFAULT_H, "color": (200, 100, 50), "title": CO2},
+    NO_ACTIVE: {X: 0, Y:0, W: DEFAULT_W, H: DEFAULT_H, "color": (128, 128, 128), "title": NO_ACTIVE}
 }
 DEFAULT_WARNING_THRES = {HCHO: 0.098, CO: 35, CO2: 1000}
 
@@ -58,6 +62,12 @@ def load_config():
     return config
 
 
+def copy_ROI(img, roi:dict):
+    x, y = roi[X], roi[Y]
+    w, h = roi[W], roi[H]
+    return img[y:y+h, x:x+w]
+
+
 def draw_ROI(img, roi:dict, active=False):
     fontFace = cv2.FONT_HERSHEY_SIMPLEX
     fontScale = 0.5
@@ -65,10 +75,10 @@ def draw_ROI(img, roi:dict, active=False):
         border_color = (0, 250, 0)
     else:
         border_color = roi["color"]
-    cv2.rectangle(img, (roi["x"], roi["y"]), (roi["x"] + roi["w"], roi["y"] + roi["h"]), border_color, 2)
+    cv2.rectangle(img, (roi[X], roi[Y]), (roi[X] + roi[W], roi[Y] + roi[H]), border_color, 2)
     (text_w, text_h), baseline = cv2.getTextSize(roi["title"], fontFace, fontScale, 1)
-    x = roi["x"] - text_w - 2
-    y = roi["y"] + text_h
+    x = roi[X] - text_w - 2
+    y = roi[Y] + text_h
     cv2.putText(img, roi["title"], (x, y), fontFace, fontScale, border_color, 1, cv2.LINE_AA)
 
 
@@ -98,16 +108,17 @@ def liveview():
     liveview_w = 800
     liveview_h = 600
 
-    start_time = time.time()
-    event1_start_time = time.time()
     test_frame = build_test_frame(liveview_w, liveview_h)
 
     step = 1
     activeROI = NO_ACTIVE
+
     config = load_config()
     roi = config["roi"]
     warning_thres = config["warning threshold"]
 
+    start_time = time.time()
+    event1_start_time = time.time()
     while True:
         elapsed = time.time() - start_time
 
@@ -119,6 +130,12 @@ def liveview():
         # Iterative action
         if (time.time() - event1_start_time) >= 10.0:
             # do OCR every 10 seconds
+            img_hcho = copy_ROI(frame, roi[HCHO])
+            img_co = copy_ROI(frame, roi[CO])
+            img_co2 = copy_ROI(frame, roi[CO2])
+            # hcho = ssocr_7seg(img_hcho)
+            # co = ssocr_7seg(img_co)
+            # co2 = ssocr_7seg(img_co2)
             try:
                 # Convert OCR result to float value
                 concentration = {
@@ -144,6 +161,7 @@ def liveview():
         draw_ROI(disp, roi[CO], activeROI == CO)
         draw_ROI(disp, roi[CO2], activeROI == CO2)
 
+        # Draw the elapsed time
         draw_elapsed(disp, elapsed)
        
         cv2.imshow("Live view", disp)
@@ -152,22 +170,20 @@ def liveview():
         if key == ord('q'):
             break
         elif key == ord('w'):            
-            if roi[activeROI]["y"] > 1:
-               roi[activeROI]["y"] -= step
+            if roi[activeROI][Y] > 1:
+               roi[activeROI][Y] -= step
         elif key == ord('s'):
-            if roi[activeROI]["y"] < liveview_h - roi[activeROI]["h"] - 1:
-                roi[activeROI]["y"] += step
+            if roi[activeROI][Y] < liveview_h - roi[activeROI][H] - 1:
+                roi[activeROI][Y] += step
         elif key == ord('a'):
-            if roi[activeROI]["x"] > 1:
-                roi[activeROI]["x"] -= step
+            if roi[activeROI][X] > 1:
+                roi[activeROI][X] -= step
         elif key == ord('d'):
-            if roi[activeROI]["x"] < liveview_w - roi[activeROI]["w"] - 1:
-                roi[activeROI]["x"] += step
+            if roi[activeROI][X] < liveview_w - roi[activeROI][W] - 1:
+                roi[activeROI][X] += step
         elif key == ord('e'):
             if (activeROI != NO_ACTIVE):
-                x, y = roi[activeROI]["x"], roi[activeROI]["y"]
-                w, h = roi[activeROI]["w"], roi[activeROI]["h"]
-                roi_img = frame[y:y+h, x:x+w]
+                roi_img = copy_ROI(frame, roi[activeROI])
                 cv2.imshow('ROI', roi_img)
         elif key == ord('t'):
             if step == 1:
@@ -185,8 +201,6 @@ def liveview():
         elif key == ord('3'):
             activeROI = CO2
         elif key == ord('o'):
-            config["roi"] = roi
-            config["warning threshold"] = warning_thres
             save_config(config)
         elif key != 0xff:
             print(f'key = {key}')
