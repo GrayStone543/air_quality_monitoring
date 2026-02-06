@@ -36,23 +36,25 @@ def save_config(config):
         json.dump(config, f, ensure_ascii=False, indent=4)
 
 def load_config():
-    config = {}
     try:
         with open("config.json", "r") as f:
             config = json.load(f)
-            try:
-                roi = config["roi"]
-            except KeyError:
-                config["roi"] = DEFAULT_ROI
-            try:
-                warning_thres = config["warning threshold"]
-            except KeyError:
-                config["warning threshold"] = DEFAULT_WARNING_THRES
-    except FileNotFoundError:
+    except (FileNotFoundError, json.decoder.JSONDecodeError):
         config = {
             "version": 1.0,
             "warning threshold": DEFAULT_WARNING_THRES,
             "roi": DEFAULT_ROI }
+
+    try:
+        roi = config["roi"]
+    except KeyError:
+        config["roi"] = DEFAULT_ROI
+
+    try:
+        warning_thres = config["warning threshold"]
+    except KeyError:
+        config["warning threshold"] = DEFAULT_WARNING_THRES
+
     return config
 
 
@@ -124,7 +126,7 @@ def liveview():
                     CO: float(co),
                     CO2: float(co2)
                 }
-                
+
                 # send a log to the Google Sheet
                 
                 # check warning threshold here
@@ -183,6 +185,8 @@ def liveview():
         elif key == ord('3'):
             activeROI = CO2
         elif key == ord('o'):
+            config["roi"] = roi
+            config["warning threshold"] = warning_thres
             save_config(config)
         elif key != 0xff:
             print(f'key = {key}')
