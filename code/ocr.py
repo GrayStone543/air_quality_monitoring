@@ -40,8 +40,25 @@ def tesseract_7seg(cv2_img):
     text = pytesseract.image_to_string(cv2_img, config=custom_config)
     return text
 
+''' 當 morph_open 為 True 時，先侵蝕後擴張，否則是 先擴張後侵蝕。'''
+def morphology(image, morph_open=False, iterations=2):
+    kernel = np.ones((3, 3), np.uint8)
+    op = cv2.MORPH_OPEN if morph_open else cv2.MORPH_CLOSE
+    processed_img = cv2.morphologyEx(image, op, kernel, iterations=iterations)
+    return processed_img
 
-def preprocess(image, using_clahe=True, using_blur=False, binarization=True, morphology=False):
+''' 擴張 '''
+def dilate(image, iterations=1):
+    kernel = np.ones((3, 3), np.uint8)
+    return cv2.dilate(image, kernel, iterations=iterations)
+
+''' 侵蝕 '''
+def erode(image, iterations=1):
+    kernel = np.ones((3, 3), np.uint8)
+    return cv2.erode(image, kernel, iterations=iterations)
+
+
+def preprocess(image, using_clahe=True, using_blur=False, binarization=True):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     #gray = cv2.convertScaleAbs(gray, alpha=1.2, beta=10)
 
@@ -61,16 +78,8 @@ def preprocess(image, using_clahe=True, using_blur=False, binarization=True, mor
     else:
         thresh = blurred
 
-    if morphology:
-        kernel = np.ones((3, 3), np.uint8)
-        fixed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
-    else:
-        fixed = thresh
+    return thresh
 
-    # optional, enhance again
-    #fixed = cv2.dilate(fixed, kernel, iterations=1)
-
-    return fixed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("7-Segments OCR")
@@ -80,7 +89,8 @@ if __name__ == "__main__":
 
     if type(args.input).__name__ != 'NoneType':
         img = cv2.imread(args.input)
-        processed_img = preprocess(img, using_clahe=True, using_blur=False, binarization=True, morphology=False)
+        processed_img = preprocess(img, using_clahe=True, using_blur=False, binarization=True)
+        processed_img = morphology(processed_img, False)
         cv2.imshow("processed", processed_img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
